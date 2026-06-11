@@ -13,12 +13,13 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 465
-app.config["MAIL_USE_TLS"] = False
-app.config["MAIL_USE_SSL"] = True
+app.config["MAIL_PORT"] = 587
+app.config["MAIL_USE_TLS"] = True
+app.config["MAIL_USE_SSL"] = False
 app.config["MAIL_USERNAME"] = os.getenv("GMAIL_USER")
 app.config["MAIL_PASSWORD"] = os.getenv("GMAIL_APP_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = os.getenv("GMAIL_USER")
+app.config["MAIL_TIMEOUT"] = 20
 
 mail = Mail(app)
 
