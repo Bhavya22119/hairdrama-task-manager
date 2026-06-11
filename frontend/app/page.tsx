@@ -33,10 +33,11 @@ export default function Home() {
   const [isCreating, setIsCreating] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (email: string) => {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
+      .or(`created_by.eq.${email},assigned_to.eq.${email}`)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -74,7 +75,7 @@ export default function Home() {
 
       if (data.user) {
         setUser(data.user);
-        await fetchTasks();
+        await fetchTasks(data.user.email || "");
       }
     };
 
@@ -149,7 +150,7 @@ export default function Home() {
     setDescription("");
     setAssignedTo("");
 
-    await fetchTasks();
+    await fetchTasks(user.email || "");
     setIsCreating(false);
   };
 
@@ -194,7 +195,7 @@ export default function Home() {
 
     alert("Task Marked Completed and Email Sent");
 
-    await fetchTasks();
+    await fetchTasks(user.email || "");
     setCompletingTaskId(null);
   };
 

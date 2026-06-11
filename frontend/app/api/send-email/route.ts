@@ -31,9 +31,17 @@ export async function POST(request: Request) {
       body: JSON.stringify(body.payload),
     });
 
-    const result = await response.json().catch(() => ({
-      error: "Backend returned an invalid response",
-    }));
+    const responseText = await response.text();
+    let result: { error?: string; message?: string };
+
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = {
+        error:
+          "Backend returned an invalid response. Check NEXT_PUBLIC_BACKEND_URL in Vercel and make sure Render backend is live.",
+      };
+    }
 
     if (!response.ok) {
       return NextResponse.json(
