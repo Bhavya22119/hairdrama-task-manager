@@ -28,7 +28,7 @@ flowchart LR
 
 - Google login with Gmail accounts
 - Create tasks with title, description, and assigned email
-- View all tasks from Supabase
+- View tasks assigned to the logged-in user
 - Mark pending tasks as completed
 - Email notification when a task is assigned
 - Email notification when a task is completed

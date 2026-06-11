@@ -37,7 +37,7 @@ export default function Home() {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
-      .or(`created_by.eq.${email},assigned_to.eq.${email}`)
+      .eq("assigned_to", email)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -140,6 +140,11 @@ export default function Home() {
       alert(
         "Email error: " + (err instanceof Error ? err.message : "Unknown error")
       );
+      alert("Task Created Successfully, but email was not sent");
+      setTitle("");
+      setDescription("");
+      setAssignedTo("");
+      await fetchTasks(user.email || "");
       setIsCreating(false);
       return;
     }
@@ -189,6 +194,8 @@ export default function Home() {
       alert(
         "Email error: " + (err instanceof Error ? err.message : "Unknown error")
       );
+      alert("Task Marked Completed, but email was not sent");
+      await fetchTasks(user.email || "");
       setCompletingTaskId(null);
       return;
     }

@@ -27,7 +27,7 @@ The status is limited to `pending` or `completed`.
 
 The main UI is in `frontend/app/page.tsx`.
 
-- `fetchTasks()` reads tasks from Supabase.
+- `fetchTasks()` reads tasks from Supabase where `assigned_to` matches the logged-in user's email.
 - `createTask()` inserts a new row into Supabase and then calls the email API.
 - `completeTask()` updates the task status and then calls the completion email API.
 - Loading states show `Creating...` and `Completing...` so the user knows the click worked.
