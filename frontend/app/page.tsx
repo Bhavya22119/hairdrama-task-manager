@@ -32,6 +32,7 @@ export default function Home() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 
   const fetchTasks = async (email: string) => {
     const { data, error } = await supabase
@@ -49,7 +50,11 @@ export default function Home() {
   };
 
   const sendEmailRequest = async (endpoint: string, payload: EmailPayload) => {
-    const response = await fetch("/api/send-email", {
+    if (!backendUrl) {
+      throw new Error("Backend URL not found");
+    }
+
+    const response = await fetch(`${backendUrl.replace(/\/$/, "")}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
