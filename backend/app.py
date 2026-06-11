@@ -4,6 +4,8 @@ from flask_mail import Mail, Message
 from dotenv import load_dotenv
 import os
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv()
 
 app = Flask(__name__)
@@ -19,6 +21,27 @@ app.config["MAIL_PASSWORD"] = os.getenv("GMAIL_APP_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = os.getenv("GMAIL_USER")
 
 mail = Mail(app)
+
+
+def validate_mail_config():
+    if not app.config["MAIL_USERNAME"] or not app.config["MAIL_PASSWORD"]:
+        return "GMAIL_USER and GMAIL_APP_PASSWORD must be set on the backend"
+
+    return None
+
+
+def send_task_email(subject, recipient, body):
+    config_error = validate_mail_config()
+    if config_error:
+        return config_error
+
+    msg = Message(
+        subject=subject,
+        recipients=[recipient],
+        body=body,
+    )
+    mail.send(msg)
+    return None
 
 
 @app.after_request
@@ -50,10 +73,10 @@ def send_task_created_email():
         if not assigned_to or not title:
             return jsonify({"error": "assigned_to and title are required"}), 400
 
-        msg = Message(
-            subject="New Task Assigned",
-            recipients=[assigned_to],
-            body=f"""
+        error = send_task_email(
+            "New Task Assigned",
+            assigned_to,
+            f"""
 Hello,
 
 A new task has been assigned to you.
@@ -67,7 +90,8 @@ Hairdrama Task Manager
 """
         )
 
-        mail.send(msg)
+        if error:
+            return jsonify({"error": error}), 500
 
         return jsonify({"message": "Task created email sent"}), 200
 
@@ -90,10 +114,10 @@ def send_task_completed_email():
         if not assigned_to or not title:
             return jsonify({"error": "assigned_to and title are required"}), 400
 
-        msg = Message(
-            subject="Task Completed",
-            recipients=[assigned_to],
-            body=f"""
+        error = send_task_email(
+            "Task Completed",
+            assigned_to,
+            f"""
 Hello,
 
 Your task has been marked as completed.
@@ -106,7 +130,8 @@ Hairdrama Task Manager
 """
         )
 
-        mail.send(msg)
+        if error:
+            return jsonify({"error": error}), 500
 
         return jsonify({"message": "Task completed email sent"}), 200
 

@@ -1,18 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "../src/lib/supabase";
 
+type Task = {
+  id: string;
+  title: string;
+  description: string | null;
+  assigned_to: string;
+  created_by: string;
+  status: string;
+};
+
+type EmailPayload = {
+  assigned_to: string;
+  title: string;
+  description?: string;
+  created_by?: string;
+  completed_by?: string;
+};
+
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
 
-  const [tasks, setTasks] = useState<any[]>([]);
-
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
   const fetchTasks = async () => {
     const { data, error } = await supabase
@@ -28,13 +47,16 @@ export default function Home() {
     setTasks(data || []);
   };
 
-  const sendEmailRequest = async (endpoint: string, payload: any) => {
-    const response = await fetch(`${backendUrl}${endpoint}`, {
+  const sendEmailRequest = async (endpoint: string, payload: EmailPayload) => {
+    const response = await fetch("/api/send-email", {
       method: "POST",
       headers: {
-        "Content-Type": "text/plain",
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        endpoint,
+        payload,
+      }),
     });
 
     const result = await response.json();
@@ -60,9 +82,16 @@ export default function Home() {
   }, []);
 
   const loginWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
+    setIsLoggingIn(true);
+
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
     });
+
+    if (error) {
+      alert("Login error: " + error.message);
+      setIsLoggingIn(false);
+    }
   };
 
   const logout = async () => {
@@ -71,10 +100,17 @@ export default function Home() {
   };
 
   const createTask = async () => {
+    if (!user) {
+      alert("Please login first");
+      return;
+    }
+
     if (!title || !assignedTo) {
       alert("Title and Assigned Email are required");
       return;
     }
+
+    setIsCreating(true);
 
     const { error } = await supabase.from("tasks").insert([
       {
@@ -88,6 +124,7 @@ export default function Home() {
 
     if (error) {
       alert("Create task error: " + error.message);
+      setIsCreating(false);
       return;
     }
 
@@ -98,17 +135,22 @@ export default function Home() {
         description,
         created_by: user.email,
       });
-    } catch (err: any) {
-      alert("Email error: " + err.message);
+    } catch (err: unknown) {
+      alert(
+        "Email error: " + (err instanceof Error ? err.message : "Unknown error")
+      );
+      setIsCreating(false);
+      return;
     }
 
-    alert("Task Created Successfully");
+    alert("Task Created Successfully and Email Sent");
 
     setTitle("");
     setDescription("");
     setAssignedTo("");
 
     await fetchTasks();
+    setIsCreating(false);
   };
 
   const completeTask = async (
@@ -116,6 +158,13 @@ export default function Home() {
     assignedToEmail: string,
     taskTitle: string
   ) => {
+    if (!user) {
+      alert("Please login first");
+      return;
+    }
+
+    setCompletingTaskId(id);
+
     const { error } = await supabase
       .from("tasks")
       .update({
@@ -125,6 +174,7 @@ export default function Home() {
 
     if (error) {
       alert("Complete task error: " + error.message);
+      setCompletingTaskId(null);
       return;
     }
 
@@ -134,14 +184,24 @@ export default function Home() {
         title: taskTitle,
         completed_by: user.email,
       });
-    } catch (err: any) {
-      alert("Email error: " + err.message);
+    } catch (err: unknown) {
+      alert(
+        "Email error: " + (err instanceof Error ? err.message : "Unknown error")
+      );
+      setCompletingTaskId(null);
+      return;
     }
 
-    alert("Task Marked Completed");
+    alert("Task Marked Completed and Email Sent");
 
     await fetchTasks();
+    setCompletingTaskId(null);
   };
+
+  const buttonBase =
+    "cursor-pointer rounded font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-sm";
+
+  const displayName = user?.email?.split("@")[0] || "User";
 
   if (!user) {
     return (
@@ -150,98 +210,141 @@ export default function Home() {
 
         <button
           onClick={loginWithGoogle}
-          className="bg-black text-white px-5 py-3 rounded-lg"
+          disabled={isLoggingIn}
+          className={`${buttonBase} bg-black px-5 py-3 text-white hover:bg-zinc-800 focus:outline-none focus:ring-4 focus:ring-zinc-300`}
         >
-          Login with Google
+          {isLoggingIn ? "Opening Google..." : "Login with Google"}
         </button>
       </div>
     );
   }
 
   return (
-    <div className="p-10 flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">Welcome {user.email}</h1>
-
-      <p>Backend URL: {backendUrl || "NOT FOUND"}</p>
-
-      <input
-        type="text"
-        placeholder="Task Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="border p-2 rounded"
-      />
-
-      <textarea
-        placeholder="Task Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        className="border p-2 rounded"
-      />
-
-      <input
-        type="email"
-        placeholder="Assign To Email"
-        value={assignedTo}
-        onChange={(e) => setAssignedTo(e.target.value)}
-        className="border p-2 rounded"
-      />
-
-      <button
-        onClick={createTask}
-        className="bg-green-600 text-white p-2 rounded"
-      >
-        Create Task
-      </button>
-
-      <button
-        onClick={logout}
-        className="bg-red-500 text-white p-2 rounded"
-      >
-        Logout
-      </button>
-
-      <hr />
-
-      <h2 className="text-2xl font-bold">Tasks</h2>
-
-      {tasks.length === 0 ? (
-        <p>No Tasks Found</p>
-      ) : (
-        tasks.map((task) => (
-          <div
-            key={task.id}
-            className="border p-4 rounded flex flex-col gap-2"
-          >
-            <h3 className="font-bold text-lg">{task.title}</h3>
-
-            <p>{task.description}</p>
-
-            <p>
-              <b>Assigned To:</b> {task.assigned_to}
+    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-950">
+              Welcome {displayName}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Create, assign, and track team tasks in one place.
             </p>
-
-            <p>
-              <b>Created By:</b> {task.created_by}
-            </p>
-
-            <p>
-              <b>Status:</b> {task.status}
-            </p>
-
-            {task.status !== "completed" && (
-              <button
-                onClick={() =>
-                  completeTask(task.id, task.assigned_to, task.title)
-                }
-                className="bg-blue-500 text-white px-3 py-2 rounded w-fit"
-              >
-                Mark Complete
-              </button>
-            )}
           </div>
-        ))
-      )}
-    </div>
+
+          <button
+            onClick={logout}
+            className={`${buttonBase} bg-rose-500 px-4 py-2 text-white hover:bg-rose-600 focus:outline-none focus:ring-4 focus:ring-rose-200`}
+          >
+            Logout
+          </button>
+        </section>
+
+        <section className="rounded-lg border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+          <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr_1fr_auto]">
+            <input
+              type="text"
+              placeholder="Task Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="rounded border border-emerald-200 bg-white p-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+
+            <textarea
+              placeholder="Task Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-12 rounded border border-emerald-200 bg-white p-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 lg:min-h-0"
+            />
+
+            <input
+              type="email"
+              placeholder="Assign To Email"
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="rounded border border-emerald-200 bg-white p-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            />
+
+            <button
+              onClick={createTask}
+              disabled={isCreating}
+              className={`${buttonBase} bg-emerald-600 px-5 py-3 text-white hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200`}
+            >
+              {isCreating ? "Creating..." : "Create Task"}
+            </button>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-slate-950">Tasks</h2>
+            <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-700">
+              {tasks.length} total
+            </span>
+          </div>
+
+          {tasks.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
+              No Tasks Found
+            </p>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {tasks.map((task) => (
+                <article
+                  key={task.id}
+                  className="flex min-h-56 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="line-clamp-2 text-lg font-bold text-slate-950">
+                      {task.title}
+                    </h3>
+
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        task.status === "completed"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {task.status}
+                    </span>
+                  </div>
+
+                  <p className="line-clamp-3 flex-1 text-sm text-slate-600">
+                    {task.description || "No description"}
+                  </p>
+
+                  <div className="space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
+                    <p className="truncate">
+                      <b className="text-slate-800">Assigned:</b>{" "}
+                      {task.assigned_to}
+                    </p>
+
+                    <p className="truncate">
+                      <b className="text-slate-800">Created:</b>{" "}
+                      {task.created_by}
+                    </p>
+                  </div>
+
+                  {task.status !== "completed" && (
+                    <button
+                      onClick={() =>
+                        completeTask(task.id, task.assigned_to, task.title)
+                      }
+                      disabled={completingTaskId === task.id}
+                      className={`${buttonBase} mt-auto w-fit bg-sky-500 px-3 py-2 text-white hover:bg-sky-600 focus:outline-none focus:ring-4 focus:ring-sky-200`}
+                    >
+                      {completingTaskId === task.id
+                        ? "Completing..."
+                        : "Mark Complete"}
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
