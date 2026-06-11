@@ -1,8 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_mail import Mail, Message
 from dotenv import load_dotenv
+from email.message import EmailMessage
 import os
+import smtplib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -12,20 +13,12 @@ app = Flask(__name__)
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USE_SSL"] = False
-app.config["MAIL_USERNAME"] = os.getenv("GMAIL_USER")
-app.config["MAIL_PASSWORD"] = os.getenv("GMAIL_APP_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = os.getenv("GMAIL_USER")
-app.config["MAIL_TIMEOUT"] = 20
-
-mail = Mail(app)
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 
 
 def validate_mail_config():
-    if not app.config["MAIL_USERNAME"] or not app.config["MAIL_PASSWORD"]:
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         return "GMAIL_USER and GMAIL_APP_PASSWORD must be set on the backend"
 
     return None
@@ -36,12 +29,22 @@ def send_task_email(subject, recipient, body):
     if config_error:
         return config_error
 
-    msg = Message(
-        subject=subject,
-        recipients=[recipient],
-        body=body,
-    )
-    mail.send(msg)
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = GMAIL_USER
+    message["To"] = recipient
+    message.set_content(body)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as smtp:
+            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            smtp.send_message(message)
+    except Exception:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            smtp.send_message(message)
+
     return None
 
 
