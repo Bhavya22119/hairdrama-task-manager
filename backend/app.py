@@ -35,11 +35,26 @@ def send_task_email(subject, recipient, body):
     message["To"] = recipient
     message.set_content(body)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=8) as smtp:
-        smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        smtp.send_message(message)
+    errors = []
 
-    return None
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=8) as smtp:
+            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            smtp.send_message(message)
+            return None
+    except Exception as e:
+        errors.append(f"SSL 465 failed: {e}")
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=8) as smtp:
+            smtp.starttls()
+            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            smtp.send_message(message)
+            return None
+    except Exception as e:
+        errors.append(f"TLS 587 failed: {e}")
+
+    return " | ".join(errors)
 
 
 @app.after_request
