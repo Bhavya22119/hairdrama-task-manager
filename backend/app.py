@@ -24,20 +24,18 @@ def home():
 
 @app.route("/send-task-created-email", methods=["POST"])
 def send_task_created_email():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    assigned_to = data.get("assigned_to")
-    title = data.get("title")
-    description = data.get("description")
-    created_by = data.get("created_by")
+        assigned_to = data.get("assigned_to")
+        title = data.get("title")
+        description = data.get("description")
+        created_by = data.get("created_by")
 
-    if not assigned_to or not title:
-        return jsonify({"error": "assigned_to and title are required"}), 400
-
-    msg = Message(
-        subject="New Task Assigned",
-        recipients=[assigned_to],
-        body=f"""
+        msg = Message(
+            subject="New Task Assigned",
+            recipients=[assigned_to],
+            body=f"""
 Hello,
 
 A new task has been assigned to you.
@@ -49,28 +47,29 @@ Created By: {created_by}
 Regards,
 Hairdrama Task Manager
 """
-    )
+        )
 
-    mail.send(msg)
+        mail.send(msg)
 
-    return jsonify({"message": "Task created email sent"}), 200
+        return jsonify({"message": "Task created email sent"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/send-task-completed-email", methods=["POST"])
 def send_task_completed_email():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    assigned_to = data.get("assigned_to")
-    title = data.get("title")
-    completed_by = data.get("completed_by")
+        assigned_to = data.get("assigned_to")
+        title = data.get("title")
+        completed_by = data.get("completed_by")
 
-    if not assigned_to or not title:
-        return jsonify({"error": "assigned_to and title are required"}), 400
-
-    msg = Message(
-        subject="Task Completed",
-        recipients=[assigned_to],
-        body=f"""
+        msg = Message(
+            subject="Task Completed",
+            recipients=[assigned_to],
+            body=f"""
 Hello,
 
 Your task has been marked as completed.
@@ -81,11 +80,14 @@ Completed By: {completed_by}
 Regards,
 Hairdrama Task Manager
 """
-    )
+        )
 
-    mail.send(msg)
+        mail.send(msg)
 
-    return jsonify({"message": "Task completed email sent"}), 200
+        return jsonify({"message": "Task completed email sent"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
