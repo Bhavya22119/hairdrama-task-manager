@@ -7,7 +7,12 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+CORS(
+    app,
+    resources={r"/*": {"origins": "*"}},
+    supports_credentials=False
+)
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
 app.config["MAIL_PORT"] = 587
@@ -18,12 +23,25 @@ app.config["MAIL_DEFAULT_SENDER"] = os.getenv("GMAIL_USER")
 
 mail = Mail(app)
 
+
+@app.after_request
+def after_request(response):
+    response.headers.add("Access-Control-Allow-Origin", "*")
+    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    return response
+
+
 @app.route("/")
 def home():
     return {"message": "Backend is running"}
 
-@app.route("/send-task-created-email", methods=["POST"])
+
+@app.route("/send-task-created-email", methods=["POST", "OPTIONS"])
 def send_task_created_email():
+    if request.method == "OPTIONS":
+        return jsonify({"message": "ok"}), 200
+
     try:
         data = request.get_json()
 
@@ -57,8 +75,11 @@ Hairdrama Task Manager
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/send-task-completed-email", methods=["POST"])
+@app.route("/send-task-completed-email", methods=["POST", "OPTIONS"])
 def send_task_completed_email():
+    if request.method == "OPTIONS":
+        return jsonify({"message": "ok"}), 200
+
     try:
         data = request.get_json()
 
@@ -91,4 +112,5 @@ Hairdrama Task Manager
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
