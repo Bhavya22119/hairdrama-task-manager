@@ -35,15 +35,9 @@ def send_task_email(subject, recipient, body):
     message["To"] = recipient
     message.set_content(body)
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as smtp:
-            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            smtp.send_message(message)
-    except Exception:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as smtp:
-            smtp.starttls()
-            smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-            smtp.send_message(message)
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=8) as smtp:
+        smtp.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        smtp.send_message(message)
 
     return None
 
@@ -59,6 +53,11 @@ def after_request(response):
 @app.route("/")
 def home():
     return {"message": "Backend is running"}
+
+
+@app.route("/version")
+def version():
+    return {"version": "direct-smtp-timeout-v2"}
 
 
 @app.route("/send-task-created-email", methods=["POST", "OPTIONS"])
