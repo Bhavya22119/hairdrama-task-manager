@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../src/lib/supabase";
-import axios from "axios";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -13,6 +12,8 @@ export default function Home() {
 
   const [tasks, setTasks] = useState<any[]>([]);
 
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
+
   const fetchTasks = async () => {
     const { data, error } = await supabase
       .from("tasks")
@@ -20,11 +21,29 @@ export default function Home() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.log(error.message);
+      alert("Fetch error: " + error.message);
       return;
     }
 
     setTasks(data || []);
+  };
+
+  const sendEmailRequest = async (endpoint: string, payload: any) => {
+    const response = await fetch(`${backendUrl}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Email request failed");
+    }
+
+    return result;
   };
 
   useEffect(() => {
@@ -68,22 +87,19 @@ export default function Home() {
     ]);
 
     if (error) {
-      alert(error.message);
+      alert("Create task error: " + error.message);
       return;
     }
 
     try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/send-task-created-email`,
-        {
-          assigned_to: assignedTo,
-          title,
-          description,
-          created_by: user.email,
-        }
-      );
-    } catch (err) {
-      console.log(err);
+      await sendEmailRequest("/send-task-created-email", {
+        assigned_to: assignedTo,
+        title,
+        description,
+        created_by: user.email,
+      });
+    } catch (err: any) {
+      alert("Email error: " + err.message);
     }
 
     alert("Task Created Successfully");
@@ -97,8 +113,8 @@ export default function Home() {
 
   const completeTask = async (
     id: string,
-    assignedTo: string,
-    title: string
+    assignedToEmail: string,
+    taskTitle: string
   ) => {
     const { error } = await supabase
       .from("tasks")
@@ -108,21 +124,18 @@ export default function Home() {
       .eq("id", id);
 
     if (error) {
-      alert(error.message);
+      alert("Complete task error: " + error.message);
       return;
     }
 
     try {
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/send-task-completed-email`,
-        {
-          assigned_to: assignedTo,
-          title,
-          completed_by: user.email,
-        }
-      );
-    } catch (err) {
-      console.log(err);
+      await sendEmailRequest("/send-task-completed-email", {
+        assigned_to: assignedToEmail,
+        title: taskTitle,
+        completed_by: user.email,
+      });
+    } catch (err: any) {
+      alert("Email error: " + err.message);
     }
 
     alert("Task Marked Completed");
@@ -133,9 +146,7 @@ export default function Home() {
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-5">
-        <h1 className="text-3xl font-bold">
-          Hairdrama Task Manager
-        </h1>
+        <h1 className="text-3xl font-bold">Hairdrama Task Manager</h1>
 
         <button
           onClick={loginWithGoogle}
@@ -149,9 +160,9 @@ export default function Home() {
 
   return (
     <div className="p-10 flex flex-col gap-4">
-      <h1 className="text-3xl font-bold">
-        Welcome {user.email}
-      </h1>
+      <h1 className="text-3xl font-bold">Welcome {user.email}</h1>
+
+      <p>Backend URL: {backendUrl || "NOT FOUND"}</p>
 
       <input
         type="text"
@@ -192,9 +203,7 @@ export default function Home() {
 
       <hr />
 
-      <h2 className="text-2xl font-bold">
-        Tasks
-      </h2>
+      <h2 className="text-2xl font-bold">Tasks</h2>
 
       {tasks.length === 0 ? (
         <p>No Tasks Found</p>
@@ -204,9 +213,7 @@ export default function Home() {
             key={task.id}
             className="border p-4 rounded flex flex-col gap-2"
           >
-            <h3 className="font-bold text-lg">
-              {task.title}
-            </h3>
+            <h3 className="font-bold text-lg">{task.title}</h3>
 
             <p>{task.description}</p>
 
@@ -225,11 +232,7 @@ export default function Home() {
             {task.status !== "completed" && (
               <button
                 onClick={() =>
-                  completeTask(
-                    task.id,
-                    task.assigned_to,
-                    task.title
-                  )
+                  completeTask(task.id, task.assigned_to, task.title)
                 }
                 className="bg-blue-500 text-white px-3 py-2 rounded w-fit"
               >

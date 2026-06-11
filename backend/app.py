@@ -8,11 +8,7 @@ load_dotenv()
 
 app = Flask(__name__)
 
-CORS(
-    app,
-    resources={r"/*": {"origins": "*"}},
-    supports_credentials=False
-)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
 app.config["MAIL_PORT"] = 587
@@ -26,9 +22,9 @@ mail = Mail(app)
 
 @app.after_request
 def after_request(response):
-    response.headers.add("Access-Control-Allow-Origin", "*")
-    response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-    response.headers.add("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
     return response
 
 
@@ -43,12 +39,15 @@ def send_task_created_email():
         return jsonify({"message": "ok"}), 200
 
     try:
-        data = request.get_json()
+        data = request.get_json(force=True)
 
         assigned_to = data.get("assigned_to")
         title = data.get("title")
         description = data.get("description")
         created_by = data.get("created_by")
+
+        if not assigned_to or not title:
+            return jsonify({"error": "assigned_to and title are required"}), 400
 
         msg = Message(
             subject="New Task Assigned",
@@ -81,11 +80,14 @@ def send_task_completed_email():
         return jsonify({"message": "ok"}), 200
 
     try:
-        data = request.get_json()
+        data = request.get_json(force=True)
 
         assigned_to = data.get("assigned_to")
         title = data.get("title")
         completed_by = data.get("completed_by")
+
+        if not assigned_to or not title:
+            return jsonify({"error": "assigned_to and title are required"}), 400
 
         msg = Message(
             subject="Task Completed",
