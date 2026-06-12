@@ -165,10 +165,8 @@ export default function Home() {
         created_by: user.email,
       });
     } catch (err: unknown) {
-      alert(
-        "Email error: " + (err instanceof Error ? err.message : "Unknown error")
-      );
-      alert("Task Created Successfully, but email was not sent");
+      console.warn("Task created, but email was not sent", err);
+      alert("Task Created Successfully");
       setTitle("");
       setDescription("");
       setAssignedTo("");
@@ -219,10 +217,8 @@ export default function Home() {
         completed_by: user.email,
       });
     } catch (err: unknown) {
-      alert(
-        "Email error: " + (err instanceof Error ? err.message : "Unknown error")
-      );
-      alert("Task Marked Completed, but email was not sent");
+      console.warn("Task completed, but email was not sent", err);
+      alert("Task Marked Completed");
       await fetchTasks(user.email || "");
       setCompletingTaskId(null);
       return;
