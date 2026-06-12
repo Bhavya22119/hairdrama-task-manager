@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "../src/lib/supabase";
 
 type Task = {
@@ -23,9 +23,6 @@ type EmailPayload = {
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
-  const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(
-    null
-  );
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -35,12 +32,12 @@ export default function Home() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
-
-  const saveSession = (session: Session | null) => {
-    setUser(session?.user || null);
-    setGoogleAccessToken(session?.provider_token || null);
-  };
+  const isLocalApp =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname);
+  const backendUrl = isLocalApp
+    ? process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000"
+    : "https://hairdrama-backend-b872.onrender.com";
 
   const fetchTasks = async (email: string) => {
     const { data, error } = await supabase
@@ -58,123 +55,39 @@ export default function Home() {
   };
 
   const sendEmailRequest = async (endpoint: string, payload: EmailPayload) => {
-    const backendError = backendUrl
-      ? await sendEmailWithBackend(endpoint, payload)
-      : "Backend URL not found";
-
-    if (!backendError) {
-      return;
+    if (!backendUrl) {
+      throw new Error("Backend URL not found");
     }
 
-    await sendEmailWithGmailApi(endpoint, payload, backendError);
-  };
-
-  const sendEmailWithBackend = async (
-    endpoint: string,
-    payload: EmailPayload
-  ) => {
-    try {
-      const response = await fetch(`${backendUrl?.replace(/\/$/, "")}${endpoint}`, {
+    const response = await fetch(
+      `${backendUrl.replace(/\/$/, "")}${endpoint}`,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        return result.error || "Email request failed";
-      }
-
-      return null;
-    } catch (error: unknown) {
-      return error instanceof Error ? error.message : "Backend email failed";
-    }
-  };
-
-  const createRawEmail = (to: string, subject: string, body: string) => {
-    const message = [
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      body,
-    ].join("\r\n");
-
-    const bytes = new TextEncoder().encode(message);
-    let binary = "";
-    bytes.forEach((byte) => {
-      binary += String.fromCharCode(byte);
-    });
-
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  };
-
-  const sendEmailWithGmailApi = async (
-    endpoint: string,
-    payload: EmailPayload,
-    backendError: string
-  ) => {
-    if (!googleAccessToken) {
-      throw new Error(
-        `Backend email failed: ${backendError}. Please logout and login again to allow Gmail sending.`
-      );
-    }
-
-    const isCreatedEmail = endpoint.includes("created");
-    const subject = isCreatedEmail ? "New Task Assigned" : "Task Completed";
-    const body = isCreatedEmail
-      ? `Hello,
-
-A new task has been assigned to you.
-
-Title: ${payload.title}
-Description: ${payload.description || "No description"}
-Created By: ${payload.created_by}
-
-Regards,
-Hairdrama Task Manager`
-      : `Hello,
-
-Your task has been marked as completed.
-
-Title: ${payload.title}
-Completed By: ${payload.completed_by}
-
-Regards,
-Hairdrama Task Manager`;
-
-    const response = await fetch(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${googleAccessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          raw: createRawEmail(payload.assigned_to, subject, body),
-        }),
       }
     );
 
+    const result = await response.json().catch(() => ({
+      error: "Backend returned an invalid response",
+    }));
+
     if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      const gmailMessage =
-        result?.error?.message || "Gmail API email request failed";
-      throw new Error(`Backend email failed: ${backendError}. ${gmailMessage}`);
+      throw new Error(result.error || "Email request failed");
     }
+
+    return result;
   };
 
   useEffect(() => {
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
       const currentUser = data.session?.user;
-      saveSession(data.session);
 
       if (currentUser) {
+        setUser(currentUser);
         await fetchTasks(currentUser.email || "");
       }
     };
@@ -185,7 +98,7 @@ Hairdrama Task Manager`;
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user || null;
-      saveSession(session);
+      setUser(currentUser);
 
       if (currentUser?.email) {
         fetchTasks(currentUser.email);
@@ -206,13 +119,6 @@ Hairdrama Task Manager`;
       provider: "google",
       options: {
         redirectTo: window.location.origin,
-        queryParams: {
-          access_type: "offline",
-          include_granted_scopes: "true",
-          prompt: "consent",
-          scope:
-            "openid email profile https://www.googleapis.com/auth/gmail.send",
-        },
       },
     });
 
