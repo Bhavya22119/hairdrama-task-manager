@@ -55,8 +55,24 @@ export default function Home() {
   };
 
   const sendEmailRequest = async (endpoint: string, payload: EmailPayload) => {
+    const appApiResponse = await fetch("/api/send-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ endpoint, payload }),
+    });
+
+    if (appApiResponse.ok) {
+      return appApiResponse.json();
+    }
+
+    const appApiResult = await appApiResponse.json().catch(() => ({
+      error: "App email API failed",
+    }));
+
     if (!backendUrl) {
-      throw new Error("Backend URL not found");
+      throw new Error(appApiResult.error || "Backend URL not found");
     }
 
     const response = await fetch(
@@ -75,7 +91,7 @@ export default function Home() {
     }));
 
     if (!response.ok) {
-      throw new Error(result.error || "Email request failed");
+      throw new Error(result.error || appApiResult.error || "Email request failed");
     }
 
     return result;
