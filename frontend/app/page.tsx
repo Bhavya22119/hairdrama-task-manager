@@ -108,8 +108,7 @@ export default function Home() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
-        skipBrowserRedirect: true,
+        redirectTo: "http://127.0.0.1:3000",
       },
     });
 
@@ -120,12 +119,8 @@ export default function Home() {
     }
 
     if (!data.url) {
-      alert("Google login URL was not created");
       setIsLoggingIn(false);
-      return;
     }
-
-    window.location.assign(data.url);
   };
 
   const logout = async () => {
