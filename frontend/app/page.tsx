@@ -59,10 +59,7 @@ export default function Home() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        endpoint,
-        payload,
-      }),
+      body: JSON.stringify(payload),
     });
 
     const result = await response.json();
@@ -112,6 +109,7 @@ export default function Home() {
       provider: "google",
       options: {
         redirectTo: window.location.origin,
+        skipBrowserRedirect: true,
       },
     });
 
@@ -121,9 +119,13 @@ export default function Home() {
       return;
     }
 
-    if (data.url) {
-      window.location.href = data.url;
+    if (!data.url) {
+      alert("Google login URL was not created");
+      setIsLoggingIn(false);
+      return;
     }
+
+    window.location.assign(data.url);
   };
 
   const logout = async () => {
