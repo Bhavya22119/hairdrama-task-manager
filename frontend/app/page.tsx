@@ -75,22 +75,40 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
+    const loadSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const currentUser = data.session?.user;
 
-      if (data.user) {
-        setUser(data.user);
-        await fetchTasks(data.user.email || "");
+      if (currentUser) {
+        setUser(currentUser);
+        await fetchTasks(currentUser.email || "");
       }
     };
 
-    loadUser();
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      if (currentUser?.email) {
+        fetchTasks(currentUser.email);
+      } else {
+        setTasks([]);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loginWithGoogle = async () => {
     setIsLoggingIn(true);
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: window.location.origin,
@@ -100,6 +118,11 @@ export default function Home() {
     if (error) {
       alert("Login error: " + error.message);
       setIsLoggingIn(false);
+      return;
+    }
+
+    if (data.url) {
+      window.location.href = data.url;
     }
   };
 
